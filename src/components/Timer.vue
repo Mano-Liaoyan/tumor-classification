@@ -55,7 +55,6 @@ export default {
             this.mySeconds = '00'// 我定义来接收计算出来的 秒钟 的
         },
         testTimer() {
-            console.log("sdf");
             this.timeFunction();
             this.timer = setInterval(() => {
                 this.timeFunction();

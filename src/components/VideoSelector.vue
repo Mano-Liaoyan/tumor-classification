@@ -4,7 +4,7 @@
             <a-row type="flex" align="middle" justyfy="space-between">
                 <!--   图片列表   -->
                 <a-col :sm="5" :md="5" :lg="5" :xl="5" :xxl="5" style="display: flex;flex-flow: column;justify-content: center;align-items: center">
-                    <p align="end" style="margin: 0 0 0.5rem 0">当前已标记 {{ current_count }}/{{ received_data.video_id.length }}</p>
+                    <p align="end" style="margin: 0 0 0.5rem 0">当前已标记 {{ this.$store.state.current_count }}/{{ received_data.video_id.length }}</p>
                     <vue-scroll>
                         <div style="height: 550px;display:flex;align-items: center;flex-flow: column">
                             <div v-for="(item,index) in this.received_data.video_id" :key="item" style="width: 80%">
@@ -87,11 +87,9 @@
         </div>
         <a-modal v-model="modalVisible" title="确定要上传吗" centered @ok="generatePostData" :okText="upload_status===2 ?'重试':'确认'"
                  cancelText="取消" :destroyOnClose=true :okButtonProps="upload_status===1?{props:{disabled:true}}:{}">
-            <p v-if="upload_status===0">请检查是否有标记错误</p>
-            <p v-if="uploading">正在上传。。。</p>
+            <p v-if="upload_status===0">上传后不可修改</p>
+            <p v-else-if="uploading">正在上传。。。</p>
             <a-spin v-if="uploading" size="large"/>
-            <a-result v-if="upload_status===1" status="success" title="上传成功" sub-title="即将刷新界面开始新的标记"></a-result>
-            <a-result v-else-if="upload_status===2" status="error" title="上传失败" sub-title="请检查网络连接或者联系你的管理员"></a-result>
         </a-modal>
     </div>
 </template>
@@ -114,36 +112,37 @@ export default {
         }),
     },
     mounted() {
-        let _this = this
-        this.$root.$on('changeData', data => {
-            if (_this.current_count !== 0)
-                _this.$confirm({
-                    content: '检测到您有未上传的数据，现在切换页面会导致数据丢失。确定要切换吗？',
-                    okText: '确认',
-                    centered: true,
-                    onOk() {
-                        _this.clearData()
-                        _this.fetchVideoList()
-                        _this.$root.$emit('changeSelectedKeys')
-                        _this.$destroyAll()
-                    },
-                    cancelText: '取消',
-                    onCancel() {
-                        _this.$destroyAll()
-                    }
-                })
-            else {
-                _this.clearData()
-                _this.fetchVideoList()
-                // 将数据再发回给side menu
-                _this.$root.$emit('changeSelectedKeys')
-            }
-        })
-        this.url = this.$store.state.server_url;
-        this.fetchClasses();
-        this.fetchVideoList();
-        //设置起始时间
-        this.post_data.start_time = new Date().getTime();
+			let _this = this
+			this.$root.$on('changeDataOfVideo', data => {
+				console.log("on: changeDataOfVideo");
+					if (_this.$store.state.current_count !== 0)
+							_this.$confirm({
+									content: '检测到您有未上传的数据，现在切换页面会导致数据丢失。确定要切换吗？',
+									okText: '确认',
+									centered: true,
+									onOk() {
+											_this.clearData()
+											_this.fetchVideoList()
+											_this.$root.$emit('changeSelectedKeys', data.keyPath)
+											_this.$destroyAll()
+									},
+									cancelText: '取消',
+									onCancel() {
+											_this.$destroyAll()
+									}
+							})
+					else {
+							_this.clearData()
+							_this.fetchVideoList()
+							// 将数据再发回给side menu
+							_this.$root.$emit('changeSelectedKeys', data.keyPath)
+					}
+			})
+			this.url = this.$store.state.server_url;
+			this.fetchClasses();
+			this.fetchVideoList();
+			//设置起始时间
+			this.post_data.start_time = new Date().getTime();
     },
     data() {
         return {
@@ -166,7 +165,6 @@ export default {
                 end_time: "",
                 results: []
             },
-            current_count: 0,
             current_class: [],
             // 分类类别
             classes: [],
@@ -184,7 +182,6 @@ export default {
                     type: "video/mp4", // 类型
                     src: "" // url地址
                 }],
-                poster: "https://timgsa.baidu.com/timg?image&quality=80&size=b9999_10000&sec=1606462956126&di=2d87964d4faf656af55d09d938640d97&imgtype=0&src=http%3A%2F%2Fattachments.gfan.com%2Fforum%2Fattachments2%2F201310%2F10%2F150326y7dzdd8d4kpjjdsd.jpg", // 封面地址
                 notSupportedMessage: "此视频暂无法播放，请稍后再试", // 允许覆盖Video.js无法播放媒体源时显示的默认信息。
                 controlBar: {
                     timeDivider: true, // 是否显示当前时间和持续时间的分隔符，"/"
@@ -224,18 +221,22 @@ export default {
             // 填入完成时间戳
             this.post_data.end_time = new Date().getTime()
             await axios.post("/api/post_video_result", this.post_data).then((res) => {
-                this.uploading = false
-                this.upload_status = 1
-                let _this = this
+								this.upload_status = 1;
+                this.uploading = true;
+                let _this = this;
                 setTimeout(() => {
                     // _this.$router.go(0);//注释掉
-                    window.location.reload()
+                    // window.location.reload()
+										this.clearData();
+										this.fetchVideoList();
+										this.$message.success("上传成功")
                 }, 1000)
             }).catch((e) => {
-                this.uploading = false
-                this.upload_status = 2
+								this.upload_status = 2;
                 this.$message.error(e);
             });
+						this.uploading = false;
+						this.upload_status = 0;
         },
         clearData() {
             this.currentVideoIdx = 0
@@ -247,7 +248,7 @@ export default {
                 s_class: [],
                 is_classified: []
             }
-            this.current_count = 0
+						this.$store.commit('$_setCurrentCount', 0);
             this.current_class = []
             this.options.sources.src = [{
                 type: "video/mp4", // 类型
@@ -258,6 +259,8 @@ export default {
             this.$set(this.post_data, "video_name", this.received_data.video_id[this.currentVideoIdx]);
             this.$set(this.post_data, "results", this.received_data.s_class[this.currentVideoIdx]);
             this.postData();
+						this.modalVisible = false;
+						this.$root.$emit('resetTimer')
         },
         // 将视频的isClassified置为false
         generateVideoClass() {
@@ -278,11 +281,13 @@ export default {
             }
 
             if (!this.received_data.is_classified[this.currentVideoIdx]) {
-                this.current_count++;
+                //this.current_count = 1;
+								this.$store.commit('$_setCurrentCount', 1)
                 this.$set(this.received_data.is_classified, this.currentVideoIdx, true)
             } else if (this.received_data.s_class[this.currentVideoIdx].length === 0) {
                 // 如果多选全都取消了，要重置状态
-                this.current_count--;
+                //this.current_count = 0;
+								this.$store.commit('$_setCurrentCount', 0)
                 this.$set(this.received_data.is_classified, this.currentVideoIdx, false)
             }
             this.refreshSelection()
@@ -298,18 +303,21 @@ export default {
                     title: '确定要切换吗',
                     content: '视频标注每次提交一个，如果切换视频，会导致当前视频的标注清空',
                     onOk() {
-                        _this.current_count--;
+                        //_this.current_count = 0;
+												_this.$store.commit('$_setCurrentCount', 0);
                         _this.received_data.is_classified[_this.currentVideoIdx] = false;
                         _this.received_data.s_class[_this.currentVideoIdx].splice(0, _this.received_data.s_class[_this.currentVideoIdx].length)
                         _this.currentVideoIdx = idx;
                         _this.image_status = 1 // 切换为拉取模式
                         _this.refreshSelection()
+												_this.$root.$emit('resetTimer')
                     }
                 });
             } else {
                 this.currentVideoIdx = idx;
                 this.image_status = 1 // 切换为拉取模式
                 this.refreshSelection()
+								this.$root.$emit('resetTimer')
             }
         },
         refreshSelection() {

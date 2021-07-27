@@ -4,7 +4,7 @@
             <a-row type="flex" align="middle" justyfy="space-between">
                 <!--   图片列表   -->
                 <a-col :sm="5" :md="5" :lg="5" :xl="5" :xxl="5" style="display: flex;flex-flow: column;justify-content: center;align-items: center">
-                    <p align="end" style="margin: 0 0 0.5rem 0">当前已标记 {{ current_count }}/{{ received_data.pic_name.length }}</p>
+                    <p align="end" style="margin: 0 0 0.5rem 0">当前已标记 {{ this.$store.state.current_count }}/{{ received_data.pic_name.length }}</p>
                     <vue-scroll>
                         <div style="height: 550px;display:flex;align-items: center;flex-flow: column">
                             <div v-for="(item,index) in this.received_data.pic_name" :key="item" style="width: 80%">
@@ -54,7 +54,7 @@
                     </a-button-group>
                     <div style="display:flex;justify-content:space-around;margin-top:30px;">
                         <a-button type="primary" size="large" @click="() => (this.modalVisible = true)"
-                                  :disabled="current_count !== received_data.pic_name.length">
+                                  :disabled="this.$store.state.current_count !== received_data.pic_name.length">
                             提交上传
                             <a-icon type="upload"/>
                         </a-button>
@@ -107,16 +107,17 @@ export default {
     },
     mounted() {
         let _this = this
-        this.$root.$on('changeData', data => {
-            if (_this.current_count !== 0)
+        this.$root.$on('changeDataOfImage', data => {
+					console.log("on: changeDataOfImage");
+            if (_this.$store.state.current_count !== 0)
                 _this.$confirm({
                     content: '检测到您有未上传的数据，现在切换页面会导致数据丢失。确定要切换吗？',
                     okText: '确认',
                     centered: true,
                     onOk() {
                         _this.clearData()
-                        _this.fetchData(data)
-                        _this.$root.$emit('changeSelectedKeys')
+                        _this.fetchData(data.item.index)
+                        _this.$root.$emit('changeSelectedKeys', data.keyPath)
                         _this.$destroyAll()
                     },
                     cancelText: '取消',
@@ -126,15 +127,14 @@ export default {
                 })
             else {
                 _this.clearData()
-                _this.fetchData(data)
+                _this.fetchData(data.item.index)
                 // 将数据再发回给side menu
-                _this.$root.$emit('changeSelectedKeys')
+                _this.$root.$emit('changeSelectedKeys', data.keyPath)
             }
         })
         this.url = this.$store.state.server_url
         this.fetchClasses()
         this.fetchData()
-        console.log("data", this.received_data)
         //设置起始时间
         this.post_data.start_time = new Date().getTime();
     },
@@ -160,7 +160,6 @@ export default {
                 end_time: "",
                 results: []
             },
-            current_count: 0,
             current_class: "",
             // 分类类别
             classes: [],
@@ -179,7 +178,6 @@ export default {
         async fetchBatchList() {
             let data = undefined
             await axios.get("/api/batch_list").then((res) => {
-                console.log("resdata", res.data)
                 if (res.data["unlabled"] == "") {
                     this.$message.info("所有图像已经被标记完毕！");
                 } else
@@ -191,13 +189,11 @@ export default {
         },
         async fetchData(ids = 0) {
             let unlabeledList = await this.fetchBatchList();
-            console.log(unlabeledList.length)
             //随机获得一个unlabeled的batch
             // let ids = Math.floor(Math.random() * unlabeledList.length);
             //填写batch_id
             this.post_data.batch_id = unlabeledList[ids]
             await axios.get("/api/img_list/" + unlabeledList[ids]).then((res) => {
-                console.log(res.data)
                 //将获得的图像列表付给received_data
                 // this.received_data.pic_name = res.data["img_list"].slice(0, 5) // 测试前5组样例
                 this.received_data.pic_name = res.data["img_list"]
@@ -225,9 +221,9 @@ export default {
             });
         },
         clearData() {
-            this.image_status = 1 // 0 = 未在拉取， 1 = 拉取中， 2 = 拉取失败
-            this.currentPictureIdx = -1
-            this.is_classified = []
+            this.image_status = 1; // 0 = 未在拉取， 1 = 拉取中， 2 = 拉取失败
+            this.currentPictureIdx = -1;
+            this.is_classified = [];
             // 接收数据
             this.received_data = {
                 pic_url: [],
@@ -235,9 +231,9 @@ export default {
                 s_class: [],
                 is_classified: []
             }
-            this.current_count = 0
-            this.current_class = ""
-            this.img_src = ""
+						this.$store.commit('$_setCurrentCount', 0);
+            this.current_class = "";
+            this.img_src = "";
         }
         ,
         generatePostData() {
@@ -266,7 +262,8 @@ export default {
             // this.received_data.s_class[this.currentPictureIdx] = e.target.value
             this.$set(this.received_data.s_class, this.currentPictureIdx, value)
             if (!this.received_data.is_classified[this.currentPictureIdx])
-                this.current_count++
+                // this.$store.state.current_count++
+								this.$store.commit('$_setCurrentCount', this.$store.state.current_count + 1)
             this.$set(this.received_data.is_classified, this.currentPictureIdx, true)
             this.refreshSelection()
         },
@@ -307,14 +304,12 @@ export default {
             axios.get('/api/img/' + this.received_data.pic_name[this.currentPictureIdx], {
                 responseType: "arraybuffer"
             }).then((res) => {
-                console.log(res)
                 this.image_status = 1
                 return 'data:image/png;base64,' + btoa(
                     new Uint8Array(res.data)
                         .reduce((data, byte) => data + String.fromCharCode(byte), '')
                 );
             }).then((data) => {
-                // console.log(data)
                 this.img_src = data;
                 this.image_status = 0
             }).catch((e) => {

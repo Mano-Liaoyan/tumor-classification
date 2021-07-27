@@ -20,8 +20,8 @@
             <a-layout-content :style="{ margin: '16px 16px', padding: '24px', background: '#fff', minHeight: '280px' }">
                 <!-- 病理诊断界面 -->
                 <vue-scroll>
-                    <ViewAndSelector v-if="current_content == 'sub1'"></ViewAndSelector>
-                    <VideoSelector v-else-if="current_content == 'sub2'"></VideoSelector>
+                    <ViewAndSelector v-show="current_content == 'sub1'"></ViewAndSelector>
+                    <VideoSelector v-show="current_content == 'sub2'"></VideoSelector>
                 </vue-scroll>
             </a-layout-content>
         </a-layout>

@@ -8,6 +8,7 @@ export default new Vuex.Store({
         server_url: "http://39.100.80.45",
         token: localStorage.getItem('token') ? localStorage.getItem('token') : '',   // token,
         username: localStorage.getItem('username') ? localStorage.getItem('username') : '', // username
+				current_count: 0
     },
     getters: {    // 监听数据变化的
         getStorage(state) {   // 获取本地存储的登录信息
@@ -27,9 +28,13 @@ export default new Vuex.Store({
             localStorage.removeItem('token');
         },
         $_setUsername(state, value) { // 设置保存用户姓名
-            state.username = value
+            state.username = value;
             localStorage.setItem('username', value);
-        }
+        },
+				$_setCurrentCount(state, value) {
+						state.current_count = value;
+						localStorage.setItem('current_count', value);
+				}
     }
 
 })
